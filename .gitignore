@@ -1,0 +1,13 @@
+# CodeIgniter 4 Git Ignore
+.env
+env
+/writable/*
+!/writable/.gitkeep
+/vendor/
+/public/uploads/*
+!/public/uploads/.gitkeep
+/public/index_backup.php
+/tests/_support/_generated
+.phpunit.result.cache
+.idea/
+.vscode/
