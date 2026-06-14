@@ -121,6 +121,7 @@ class SyncController extends BaseController
 
                 $data = [
                     'customer_id'       => $customerId,
+                    'user_id'           => $userId,
                     'client_local_id'   => $clientLocalId,
                     'device_contact_id' => $item['deviceContactId'] ?? '',
                     'display_name'      => $item['displayName'] ?? '',
@@ -134,6 +135,7 @@ class SyncController extends BaseController
                 ];
 
                 $existing = $builder->where('customer_id', $customerId)
+                                    ->where('user_id', $userId)
                                     ->where('client_local_id', $clientLocalId)
                                     ->get()
                                     ->getRow();
@@ -161,6 +163,7 @@ class SyncController extends BaseController
 
                 $data = [
                     'customer_id'                => $customerId,
+                    'user_id'                    => $userId,
                     'client_local_id'            => $clientLocalId,
                     'client_contact_snapshot_id' => isset($item['contactSnapshotId']) ? (int)$item['contactSnapshotId'] : null,
                     'name'                       => $item['name'] ?? '',
@@ -178,6 +181,7 @@ class SyncController extends BaseController
                 ];
 
                 $existing = $builder->where('customer_id', $customerId)
+                                    ->where('user_id', $userId)
                                     ->where('client_local_id', $clientLocalId)
                                     ->get()
                                     ->getRow();
@@ -205,6 +209,7 @@ class SyncController extends BaseController
 
                 $data = [
                     'customer_id'                => $customerId,
+                    'user_id'                    => $userId,
                     'client_local_id'            => $clientLocalId,
                     'client_party_id'            => (int)($item['partyId'] ?? 0),
                     'client_contact_snapshot_id' => (int)($item['contactSnapshotId'] ?? 0),
@@ -216,6 +221,7 @@ class SyncController extends BaseController
                 ];
 
                 $existing = $builder->where('customer_id', $customerId)
+                                    ->where('user_id', $userId)
                                     ->where('client_local_id', $clientLocalId)
                                     ->get()
                                     ->getRow();
@@ -243,6 +249,7 @@ class SyncController extends BaseController
 
                 $data = [
                     'customer_id'       => $customerId,
+                    'user_id'           => $userId,
                     'client_local_id'   => $clientLocalId,
                     'client_party_id'   => (int)($item['partyId'] ?? 0),
                     'type'              => $item['type'] ?? '',
@@ -263,6 +270,7 @@ class SyncController extends BaseController
                 ];
 
                 $existing = $builder->where('customer_id', $customerId)
+                                    ->where('user_id', $userId)
                                     ->where('client_local_id', $clientLocalId)
                                     ->get()
                                     ->getRow();
@@ -290,6 +298,7 @@ class SyncController extends BaseController
 
                 $data = [
                     'customer_id'           => $customerId,
+                    'user_id'               => $userId,
                     'client_local_id'       => $clientLocalId,
                     'client_transaction_id' => (int)($item['transactionId'] ?? 0),
                     'type'                  => $item['type'] ?? 'image',
@@ -300,6 +309,7 @@ class SyncController extends BaseController
                 ];
 
                 $existing = $builder->where('customer_id', $customerId)
+                                    ->where('user_id', $userId)
                                     ->where('client_local_id', $clientLocalId)
                                     ->get()
                                     ->getRow();
@@ -360,37 +370,52 @@ class SyncController extends BaseController
             'transaction_attachments' => []
         ];
 
+        // Contacts
+        $contactsQuery = $db->table('contact_snapshots')
+            ->where('customer_id', $customerId)
+            ->where('user_id', $userId);
         if ($parsedLastSync) {
-            // Contacts
-            $serverChanges['contacts'] = $db->table('contact_snapshots')
-                ->where('customer_id', $customerId)
-                ->where('updated_at >', $parsedLastSync)
-                ->get()->getResultArray();
-
-            // Parties
-            $serverChanges['parties'] = $db->table('parties')
-                ->where('customer_id', $customerId)
-                ->where('updated_at >', $parsedLastSync)
-                ->get()->getResultArray();
-
-            // Party Contacts
-            $serverChanges['party_contacts'] = $db->table('party_contacts')
-                ->where('customer_id', $customerId)
-                ->where('updated_at >', $parsedLastSync)
-                ->get()->getResultArray();
-
-            // Transactions
-            $serverChanges['transactions'] = $db->table('transactions')
-                ->where('customer_id', $customerId)
-                ->where('updated_at >', $parsedLastSync)
-                ->get()->getResultArray();
-
-            // Transaction Attachments
-            $serverChanges['transaction_attachments'] = $db->table('transaction_attachments')
-                ->where('customer_id', $customerId)
-                ->where('created_at >', $parsedLastSync)
-                ->get()->getResultArray();
+            $contactsQuery->where('updated_at >', $parsedLastSync);
         }
+        $serverChanges['contacts'] = $contactsQuery->get()->getResultArray();
+
+        // Parties
+        $partiesQuery = $db->table('parties')
+            ->where('customer_id', $customerId)
+            ->where('user_id', $userId);
+        if ($parsedLastSync) {
+            $partiesQuery->where('updated_at >', $parsedLastSync);
+        }
+        $serverChanges['parties'] = $partiesQuery->get()->getResultArray();
+
+        // Party Contacts
+        $partyContactsQuery = $db->table('party_contacts')
+            ->where('customer_id', $customerId)
+            ->where('user_id', $userId);
+        if ($parsedLastSync) {
+            $partyContactsQuery->where('updated_at >', $parsedLastSync);
+        }
+        $serverChanges['party_contacts'] = $partyContactsQuery->get()->getResultArray();
+
+        // Transactions
+        $transactionsQuery = $db->table('transactions')
+            ->where('customer_id', $customerId)
+            ->where('user_id', $userId);
+        if ($parsedLastSync) {
+            $transactionsQuery->where('updated_at >', $parsedLastSync);
+        }
+        $serverChanges['transactions'] = $transactionsQuery->get()->getResultArray();
+
+        // Transaction Attachments
+        $attachmentsQuery = $db->table('transaction_attachments')
+            ->where('customer_id', $customerId)
+            ->where('user_id', $userId);
+        if ($parsedLastSync) {
+            $attachmentsQuery->where('created_at >', $parsedLastSync);
+        }
+        $serverChanges['transaction_attachments'] = $attachmentsQuery->get()->getResultArray();
+
+        $serverChanges = $this->castServerChanges($serverChanges);
 
         return $this->response->setJSON([
             'status'         => 'success',
@@ -398,6 +423,60 @@ class SyncController extends BaseController
             'server_changes' => $serverChanges,
             'server_time'    => date('Y-m-d H:i:s')
         ]);
+    }
+
+    private function castServerChanges(array $changes): array
+    {
+        if (isset($changes['contacts'])) {
+            foreach ($changes['contacts'] as &$row) {
+                $row['id'] = (int)$row['id'];
+                $row['customer_id'] = (int)$row['customer_id'];
+                $row['user_id'] = (int)$row['user_id'];
+                $row['client_local_id'] = (int)$row['client_local_id'];
+            }
+        }
+        if (isset($changes['parties'])) {
+            foreach ($changes['parties'] as &$row) {
+                $row['id'] = (int)$row['id'];
+                $row['customer_id'] = (int)$row['customer_id'];
+                $row['user_id'] = (int)$row['user_id'];
+                $row['client_local_id'] = (int)$row['client_local_id'];
+                $row['client_contact_snapshot_id'] = isset($row['client_contact_snapshot_id']) && $row['client_contact_snapshot_id'] !== null ? (int)$row['client_contact_snapshot_id'] : null;
+                $row['is_favorite'] = (int)$row['is_favorite'];
+            }
+        }
+        if (isset($changes['party_contacts'])) {
+            foreach ($changes['party_contacts'] as &$row) {
+                $row['id'] = (int)$row['id'];
+                $row['customer_id'] = (int)$row['customer_id'];
+                $row['user_id'] = (int)$row['user_id'];
+                $row['client_local_id'] = (int)$row['client_local_id'];
+                $row['client_party_id'] = (int)$row['client_party_id'];
+                $row['client_contact_snapshot_id'] = (int)$row['client_contact_snapshot_id'];
+            }
+        }
+        if (isset($changes['transactions'])) {
+            foreach ($changes['transactions'] as &$row) {
+                $row['id'] = (int)$row['id'];
+                $row['customer_id'] = (int)$row['customer_id'];
+                $row['user_id'] = (int)$row['user_id'];
+                $row['client_local_id'] = (int)$row['client_local_id'];
+                $row['client_party_id'] = (int)$row['client_party_id'];
+                $row['quantity'] = isset($row['quantity']) && $row['quantity'] !== null ? (double)$row['quantity'] : null;
+                $row['rate_paise'] = isset($row['rate_paise']) && $row['rate_paise'] !== null ? (int)$row['rate_paise'] : null;
+                $row['amount_paise'] = (int)$row['amount_paise'];
+            }
+        }
+        if (isset($changes['transaction_attachments'])) {
+            foreach ($changes['transaction_attachments'] as &$row) {
+                $row['id'] = (int)$row['id'];
+                $row['customer_id'] = (int)$row['customer_id'];
+                $row['user_id'] = (int)$row['user_id'];
+                $row['client_local_id'] = (int)$row['client_local_id'];
+                $row['client_transaction_id'] = (int)$row['client_transaction_id'];
+            }
+        }
+        return $changes;
     }
 
     public function uploadFileSync()
@@ -450,6 +529,7 @@ class SyncController extends BaseController
 
             // Delete old file if it exists to avoid dangling leaks on retries
             $existing = $builder->where('customer_id', $customerId)
+                                ->where('user_id', $userId)
                                 ->where('client_local_id', (int)$clientLocalId)
                                 ->get()
                                 ->getRow();
@@ -463,6 +543,7 @@ class SyncController extends BaseController
 
             // Update local attachments table on the server to record the uploaded path
             $builder->where('customer_id', $customerId)
+                    ->where('user_id', $userId)
                     ->where('client_local_id', (int)$clientLocalId)
                     ->update([
                         'server_path' => $serverPath
