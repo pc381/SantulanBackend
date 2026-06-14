@@ -16,20 +16,72 @@ class SyncController extends BaseController
             if ($val > 100000000000) {
                 $val = (int)($val / 1000); // Milliseconds to seconds
             }
-            return date('Y-m-d H:i:s', $val);
         }
         $ts = strtotime($val);
         return $ts !== false ? date('Y-m-d H:i:s', $ts) : null;
     }
 
+    private function authenticateRequest(int &$status, string &$message): ?int
+    {
+        $request = service('request');
+        $authHeader = $request->getHeaderLine('Authorization');
+        
+        if (empty($authHeader) || !preg_match('/Bearer\s(\S+)/', $authHeader, $matches)) {
+            $status = 401;
+            $message = 'Missing or invalid Authorization header';
+            return null;
+        }
+
+        $token = $matches[1];
+
+        $db = \Config\Database::connect();
+        $tokenRecord = $db->table('user_tokens')
+                          ->where('token', $token)
+                          ->where('expires_at >', date('Y-m-d H:i:s'))
+                          ->get()
+                          ->getRow();
+
+        if (!$tokenRecord) {
+            $status = 401;
+            $message = 'Unauthorized or expired session token';
+            return null;
+        }
+
+        $userId = (int)$tokenRecord->user_id;
+
+        $user = $db->table('users')->where('id', $userId)->get()->getRow();
+        if (!$user) {
+            $status = 401;
+            $message = 'User account not found';
+            return null;
+        }
+
+        if ($user->status !== 'approved') {
+            $status = 403;
+            $message = 'Account pending registration approval.';
+            return null;
+        }
+
+        $status = 200;
+        return $userId;
+    }
+
     public function syncData()
     {
+        $status = 200;
+        $message = '';
+        $userId = $this->authenticateRequest($status, $message);
+
+        if (!$userId) {
+            return $this->response->setJSON([
+                'status'  => $status === 403 ? 'forbidden' : 'error',
+                'message' => $message
+            ])->setStatusCode($status);
+        }
+
         $db = \Config\Database::connect();
         $request = service('request');
         $json = $request->getJSON(true);
-
-        // Default to user_id = 1 for MVP (Step 1). Authentication will override this in Step 2.
-        $userId = 1;
 
         if (!$json) {
             return $this->response->setJSON([
@@ -341,8 +393,18 @@ class SyncController extends BaseController
 
     public function uploadFileSync()
     {
+        $status = 200;
+        $message = '';
+        $userId = $this->authenticateRequest($status, $message);
+
+        if (!$userId) {
+            return $this->response->setJSON([
+                'status'  => $status === 403 ? 'forbidden' : 'error',
+                'message' => $message
+            ])->setStatusCode($status);
+        }
+
         $request = service('request');
-        $userId = 1; // Default MVP user
 
         $clientLocalId = $request->getPost('client_local_id');
         $clientTxId = $request->getPost('client_transaction_id');
