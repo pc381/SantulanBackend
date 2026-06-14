@@ -42,7 +42,7 @@ class AddAuthColumnsToUsersTable extends Migration
                 'type'       => 'TINYINT',
                 'constraint' => 1,
                 'default'    => 0,
-                'after'      => 'status',
+                'after'      => 'reset_token_expires_at',
             ],
         ]);
 

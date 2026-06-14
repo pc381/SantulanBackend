@@ -1,0 +1,51 @@
+name: Deploy Backend to GoDaddy (cPanel)
+
+on:
+  push:
+    branches:
+      - main # Change this if your production branch is different (e.g. master)
+
+jobs:
+  web-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    steps:
+    - name: Get latest code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2' # Matches GoDaddy server PHP version
+        extensions: mbstring, xml, ctype, iconv, intl, mysqli
+        coverage: none
+
+    - name: Install Composer Dependencies
+      run: |
+        composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+
+    - name: Sync files via FTP
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        # Point this to the root directory where SantulanAPI is placed on the server
+        server-dir: /public_html/hosteddomains/Advanced/SantulanAPI/
+        # Exclude environment variables and runtime data from being overwritten
+        exclude: |
+          **/.git*
+          **/.git*/**
+          **/node_modules/**
+          .env
+          env
+          writable/session/**
+          writable/cache/**
+          writable/debugbar/**
+          writable/logs/**
+          tests/**
+          tests/_support/**
+          run_migrate.php
+          run_seed.php

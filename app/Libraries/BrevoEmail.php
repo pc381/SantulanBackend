@@ -5,8 +5,8 @@ namespace App\Libraries;
 class BrevoEmail
 {
     private string $apiKey = '';
-    private string $senderEmail = 'noreply@santulan.com';
-    private string $senderName = 'Santulan Support';
+    private string $senderEmail = 'noreply@prachitsvision.com';
+    private string $senderName = 'Santulan';
 
     public function __construct()
     {
@@ -19,6 +19,12 @@ class BrevoEmail
     public function sendEmail(string $toEmail, string $subject, string $htmlContent): bool
     {
         $url = 'https://api.brevo.com/v3/smtp/email';
+
+        // Check if API key is set
+        if (empty($this->apiKey)) {
+            log_message('error', 'Brevo email cannot be sent: API key is empty. Make sure BREVO_API_KEY is defined in .env.');
+            return false;
+        }
 
         $payload = [
             'sender' => [
@@ -34,10 +40,15 @@ class BrevoEmail
             'htmlContent' => $htmlContent
         ];
 
+        $jsonPayload = json_encode($payload);
+        log_message('info', 'Sending Brevo email to: ' . $toEmail . ' with subject: ' . $subject);
+
         $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonPayload);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'api-key: ' . $this->apiKey,
             'Content-Type: application/json',
@@ -45,10 +56,20 @@ class BrevoEmail
         ]);
 
         $response = curl_exec($ch);
+        if ($response === false) {
+            $curlError = curl_error($ch);
+            log_message('error', 'cURL Error sending email via Brevo: ' . $curlError);
+            curl_close($ch);
+            return false;
+        }
+
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
+        log_message('info', 'Brevo API Response Code: ' . $httpCode . ', Response Body: ' . $response);
+
         if ($httpCode >= 200 && $httpCode < 300) {
+            log_message('info', 'Brevo email sent successfully to ' . $toEmail);
             return true;
         }
 

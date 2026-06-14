@@ -21,7 +21,7 @@ class SyncController extends BaseController
         return $ts !== false ? date('Y-m-d H:i:s', $ts) : null;
     }
 
-    private function authenticateRequest(int &$status, string &$message): ?int
+    private function authenticateRequest(int &$status, string &$message, ?int &$userId = null): ?int
     {
         $request = service('request');
         $authHeader = $request->getHeaderLine('Authorization');
@@ -56,23 +56,31 @@ class SyncController extends BaseController
             return null;
         }
 
-        if ($user->status !== 'approved') {
+        $customer = $db->table('customers')->where('id', $user->customer_id)->get()->getRow();
+        if (!$customer) {
+            $status = 403;
+            $message = 'Customer account not found';
+            return null;
+        }
+
+        if ($customer->status !== 'approved') {
             $status = 403;
             $message = 'Account pending registration approval.';
             return null;
         }
 
         $status = 200;
-        return $userId;
+        return (int)$customer->id;
     }
 
     public function syncData()
     {
         $status = 200;
         $message = '';
-        $userId = $this->authenticateRequest($status, $message);
+        $userId = null;
+        $customerId = $this->authenticateRequest($status, $message, $userId);
 
-        if (!$userId) {
+        if (!$customerId) {
             return $this->response->setJSON([
                 'status'  => $status === 403 ? 'forbidden' : 'error',
                 'message' => $message
@@ -112,7 +120,7 @@ class SyncController extends BaseController
                 $clientLocalId = (int)$item['id'];
 
                 $data = [
-                    'user_id'           => $userId,
+                    'customer_id'       => $customerId,
                     'client_local_id'   => $clientLocalId,
                     'device_contact_id' => $item['deviceContactId'] ?? '',
                     'display_name'      => $item['displayName'] ?? '',
@@ -125,7 +133,7 @@ class SyncController extends BaseController
                     'updated_at'        => date('Y-m-d H:i:s')
                 ];
 
-                $existing = $builder->where('user_id', $userId)
+                $existing = $builder->where('customer_id', $customerId)
                                     ->where('client_local_id', $clientLocalId)
                                     ->get()
                                     ->getRow();
@@ -152,7 +160,7 @@ class SyncController extends BaseController
                 $clientLocalId = (int)$item['id'];
 
                 $data = [
-                    'user_id'                    => $userId,
+                    'customer_id'                => $customerId,
                     'client_local_id'            => $clientLocalId,
                     'client_contact_snapshot_id' => isset($item['contactSnapshotId']) ? (int)$item['contactSnapshotId'] : null,
                     'name'                       => $item['name'] ?? '',
@@ -169,7 +177,7 @@ class SyncController extends BaseController
                     'deleted_at'                 => $this->parseDateTime($item['deletedAt'] ?? null)
                 ];
 
-                $existing = $builder->where('user_id', $userId)
+                $existing = $builder->where('customer_id', $customerId)
                                     ->where('client_local_id', $clientLocalId)
                                     ->get()
                                     ->getRow();
@@ -196,7 +204,7 @@ class SyncController extends BaseController
                 $clientLocalId = (int)$item['id'];
 
                 $data = [
-                    'user_id'                    => $userId,
+                    'customer_id'                => $customerId,
                     'client_local_id'            => $clientLocalId,
                     'client_party_id'            => (int)($item['partyId'] ?? 0),
                     'client_contact_snapshot_id' => (int)($item['contactSnapshotId'] ?? 0),
@@ -207,7 +215,7 @@ class SyncController extends BaseController
                     'deleted_at'                 => $this->parseDateTime($item['deletedAt'] ?? null)
                 ];
 
-                $existing = $builder->where('user_id', $userId)
+                $existing = $builder->where('customer_id', $customerId)
                                     ->where('client_local_id', $clientLocalId)
                                     ->get()
                                     ->getRow();
@@ -234,7 +242,7 @@ class SyncController extends BaseController
                 $clientLocalId = (int)$item['id'];
 
                 $data = [
-                    'user_id'           => $userId,
+                    'customer_id'       => $customerId,
                     'client_local_id'   => $clientLocalId,
                     'client_party_id'   => (int)($item['partyId'] ?? 0),
                     'type'              => $item['type'] ?? '',
@@ -254,7 +262,7 @@ class SyncController extends BaseController
                     'deleted_at'        => $this->parseDateTime($item['deletedAt'] ?? null)
                 ];
 
-                $existing = $builder->where('user_id', $userId)
+                $existing = $builder->where('customer_id', $customerId)
                                     ->where('client_local_id', $clientLocalId)
                                     ->get()
                                     ->getRow();
@@ -281,7 +289,7 @@ class SyncController extends BaseController
                 $clientLocalId = (int)$item['id'];
 
                 $data = [
-                    'user_id'               => $userId,
+                    'customer_id'           => $customerId,
                     'client_local_id'       => $clientLocalId,
                     'client_transaction_id' => (int)($item['transactionId'] ?? 0),
                     'type'                  => $item['type'] ?? 'image',
@@ -291,7 +299,7 @@ class SyncController extends BaseController
                     'deleted_at'            => $this->parseDateTime($item['deletedAt'] ?? null)
                 ];
 
-                $existing = $builder->where('user_id', $userId)
+                $existing = $builder->where('customer_id', $customerId)
                                     ->where('client_local_id', $clientLocalId)
                                     ->get()
                                     ->getRow();
@@ -318,6 +326,7 @@ class SyncController extends BaseController
                 $clientLocalId = (int)$item['id'];
 
                 $data = [
+                    'customer_id'     => $customerId,
                     'user_id'         => $userId,
                     'client_local_id' => $clientLocalId,
                     'name'            => $item['name'] ?? '',
@@ -354,31 +363,31 @@ class SyncController extends BaseController
         if ($parsedLastSync) {
             // Contacts
             $serverChanges['contacts'] = $db->table('contact_snapshots')
-                ->where('user_id', $userId)
+                ->where('customer_id', $customerId)
                 ->where('updated_at >', $parsedLastSync)
                 ->get()->getResultArray();
 
             // Parties
             $serverChanges['parties'] = $db->table('parties')
-                ->where('user_id', $userId)
+                ->where('customer_id', $customerId)
                 ->where('updated_at >', $parsedLastSync)
                 ->get()->getResultArray();
 
             // Party Contacts
             $serverChanges['party_contacts'] = $db->table('party_contacts')
-                ->where('user_id', $userId)
+                ->where('customer_id', $customerId)
                 ->where('updated_at >', $parsedLastSync)
                 ->get()->getResultArray();
 
             // Transactions
             $serverChanges['transactions'] = $db->table('transactions')
-                ->where('user_id', $userId)
+                ->where('customer_id', $customerId)
                 ->where('updated_at >', $parsedLastSync)
                 ->get()->getResultArray();
 
             // Transaction Attachments
             $serverChanges['transaction_attachments'] = $db->table('transaction_attachments')
-                ->where('user_id', $userId)
+                ->where('customer_id', $customerId)
                 ->where('created_at >', $parsedLastSync)
                 ->get()->getResultArray();
         }
@@ -395,9 +404,10 @@ class SyncController extends BaseController
     {
         $status = 200;
         $message = '';
-        $userId = $this->authenticateRequest($status, $message);
+        $userId = null;
+        $customerId = $this->authenticateRequest($status, $message, $userId);
 
-        if (!$userId) {
+        if (!$customerId) {
             return $this->response->setJSON([
                 'status'  => $status === 403 ? 'forbidden' : 'error',
                 'message' => $message
@@ -439,7 +449,7 @@ class SyncController extends BaseController
             $builder = $db->table('transaction_attachments');
 
             // Delete old file if it exists to avoid dangling leaks on retries
-            $existing = $builder->where('user_id', $userId)
+            $existing = $builder->where('customer_id', $customerId)
                                 ->where('client_local_id', (int)$clientLocalId)
                                 ->get()
                                 ->getRow();
@@ -452,7 +462,7 @@ class SyncController extends BaseController
             }
 
             // Update local attachments table on the server to record the uploaded path
-            $builder->where('user_id', $userId)
+            $builder->where('customer_id', $customerId)
                     ->where('client_local_id', (int)$clientLocalId)
                     ->update([
                         'server_path' => $serverPath

@@ -4,7 +4,7 @@ namespace App\Database\Migrations;
 
 use CodeIgniter\Database\Migration;
 
-class CreateUsersTable extends Migration
+class CreateCustomersTable extends Migration
 {
     public function up()
     {
@@ -15,22 +15,22 @@ class CreateUsersTable extends Migration
                 'unsigned'       => true,
                 'auto_increment' => true,
             ],
-            'customer_id' => [
-                'type'       => 'INT',
-                'constraint' => 11,
-                'unsigned'   => true,
-                'null'       => true,
-            ],
-            'email' => [
+            'name' => [
                 'type'       => 'VARCHAR',
-                'constraint' => 191,
-                'unique'     => true,
+                'constraint' => 255,
             ],
-            'google_id' => [
+            'status' => [
                 'type'       => 'VARCHAR',
-                'constraint' => 191,
-                'null'       => true,
-                'unique'     => true,
+                'constraint' => 50,
+                'default'    => 'pending', // pending, approved, rejected
+            ],
+            'admin_notes' => [
+                'type' => 'TEXT',
+                'null' => true,
+            ],
+            'billing_details' => [
+                'type' => 'TEXT',
+                'null' => true,
             ],
             'created_at' => [
                 'type' => 'DATETIME',
@@ -43,12 +43,11 @@ class CreateUsersTable extends Migration
         ]);
 
         $this->forge->addKey('id', true);
-        $this->forge->addForeignKey('customer_id', 'customers', 'id', 'CASCADE', 'CASCADE');
-        $this->forge->createTable('users');
+        $this->forge->createTable('customers');
     }
 
     public function down()
     {
-        $this->forge->dropTable('users');
+        $this->forge->dropTable('customers');
     }
 }

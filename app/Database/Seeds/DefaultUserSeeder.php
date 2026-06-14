@@ -9,17 +9,33 @@ class DefaultUserSeeder extends Seeder
     public function run()
     {
         $db = \Config\Database::connect();
-        $builder = $db->table('users');
         
-        $exists = $builder->where('id', 1)->countAllResults() > 0;
-        if (!$exists) {
-            $builder->insert([
-                'id'         => 1,
-                'email'      => 'default@santulan.com',
-                'google_id'  => null,
+        // Ensure default customer exists
+        $custBuilder = $db->table('customers');
+        $customer = $custBuilder->where('name', 'Default Company')->get()->getRow();
+        
+        if (!$customer) {
+            $custBuilder->insert([
+                'name'       => 'Default Company',
                 'status'     => 'approved',
                 'created_at' => date('Y-m-d H:i:s'),
                 'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+            $customerId = $db->insertID();
+        } else {
+            $customerId = $customer->id;
+        }
+
+        $builder = $db->table('users');
+        $exists = $builder->where('email', 'default@santulan.com')->countAllResults() > 0;
+        
+        if (!$exists) {
+            $builder->insert([
+                'customer_id'   => $customerId,
+                'email'         => 'default@santulan.com',
+                'google_id'     => null,
+                'created_at'    => date('Y-m-d H:i:s'),
+                'updated_at'    => date('Y-m-d H:i:s'),
             ]);
         }
     }

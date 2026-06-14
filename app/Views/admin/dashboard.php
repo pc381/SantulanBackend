@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Santulan Admin Dashboard</title>
+    <title>Santulan CRM & Admin Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -186,6 +186,15 @@
             margin-bottom: 30px;
             font-size: 15px;
         }
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #FECACA;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            font-size: 15px;
+        }
 
         /* Table Card */
         .table-card {
@@ -217,7 +226,7 @@
         }
 
         .requests-table th, .requests-table td {
-            padding: 18px 30px;
+            padding: 14px 20px;
             border-bottom: 1px solid var(--border-color);
         }
 
@@ -242,15 +251,6 @@
             font-size: 14px;
             color: var(--text-main);
             vertical-align: middle;
-        }
-
-        .user-email {
-            font-weight: 500;
-        }
-
-        .user-provider {
-            color: var(--text-muted);
-            font-size: 13px;
         }
 
         /* Status Badges */
@@ -282,22 +282,6 @@
             border: 1px solid rgba(239, 68, 68, 0.2);
         }
 
-        /* Verification Indicator */
-        .verify-status {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 13px;
-        }
-        .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-        .dot-verified { background-color: var(--success); }
-        .dot-unverified { background-color: var(--warning); }
-
         /* Action Buttons */
         .actions-cell {
             display: flex;
@@ -312,6 +296,7 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
+            white-space: nowrap; /* Prevent button text wrapping */
         }
 
         .btn-approve {
@@ -351,7 +336,13 @@
         <div class="sidebar-brand">SANTULAN</div>
         <ul class="sidebar-menu">
             <li class="menu-item active">
-                <a href="#">Registration Requests</a>
+                <a href="<?php echo base_url('admin/dashboard'); ?>">Customers (CRM)</a>
+            </li>
+            <li class="menu-item">
+                <a href="<?php echo base_url('admin/logs'); ?>">Observability Logs</a>
+            </li>
+            <li class="menu-item">
+                <a href="<?php echo base_url('admin/change-password'); ?>">Change Password</a>
             </li>
         </ul>
         <div class="sidebar-footer">
@@ -365,7 +356,7 @@
     <div class="main-content">
         <div class="page-header">
             <div class="page-title">
-                <h1>Registration Dashboard</h1>
+                <h1>Customer CRM Dashboard</h1>
                 <p>Welcome back, Administrator</p>
             </div>
         </div>
@@ -373,19 +364,19 @@
         <!-- Stats Overview -->
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-header">Pending Approvals</div>
+                <div class="stat-header">Pending Customers</div>
                 <div class="stat-value"><?php echo $stats['pending_count']; ?></div>
             </div>
             <div class="stat-card">
-                <div class="stat-header">Active Accounts</div>
+                <div class="stat-header">Approved Customers</div>
                 <div class="stat-value"><?php echo $stats['approved_count']; ?></div>
             </div>
             <div class="stat-card">
-                <div class="stat-header">Synced Ledgers</div>
+                <div class="stat-header">Total Ledger Records</div>
                 <div class="stat-value"><?php echo $stats['total_transactions']; ?></div>
             </div>
             <div class="stat-card">
-                <div class="stat-header">Logged Events</div>
+                <div class="stat-header">Client Logs Logged</div>
                 <div class="stat-value"><?php echo $stats['total_events']; ?></div>
             </div>
         </div>
@@ -396,72 +387,103 @@
                 <?php echo htmlspecialchars(session()->getFlashdata('success')); ?>
             </div>
         <?php endif; ?>
+        <?php if (session()->getFlashdata('error')): ?>
+            <div class="alert-error">
+                <?php echo htmlspecialchars(session()->getFlashdata('error')); ?>
+            </div>
+        <?php endif; ?>
 
-        <!-- Requests Table -->
+        <!-- Create Customer Card -->
+        <div style="background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-color); border-radius: 20px; padding: 24px; margin-bottom: 30px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
+            <h2 style="font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text-main);">Create New Customer (CRM)</h2>
+            <form action="<?php echo base_url('admin/customer/create'); ?>" method="post" style="display: flex; gap: 12px; align-items: center; max-width: 500px;">
+                <input type="text" name="name" placeholder="Enter Customer / Company Name" style="flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); color: var(--text-main); padding: 10px 16px; border-radius: 10px; font-size: 14px; font-weight: 500;" required />
+                <button type="submit" class="action-btn btn-approve" style="padding: 10px 20px; border-radius: 10px; font-size: 14px;">Create & Approve</button>
+            </form>
+        </div>
+
+        <!-- CRM Customer Table -->
         <div class="table-card">
             <div class="table-header">
-                <div class="table-title">User Approvals & Registrations</div>
+                <div class="table-title">Customer Accounts & Associated Users</div>
             </div>
-            <table class="requests-table">
+            <div style="overflow-x: auto; -webkit-overflow-scrolling: touch;">
+                <table class="requests-table">
                 <thead>
                     <tr>
-                        <th>User Email</th>
-                        <th>Auth Provider</th>
-                        <th>Email Verification</th>
-                        <th>Registered Date</th>
-                        <th>Status</th>
-                        <th>Actions</th>
+                        <th style="width: 80px;">ID</th>
+                        <th style="width: 320px;">Customer / Company Name</th>
+                        <th>Registered Users</th>
+                        <th style="width: 140px;">Registered</th>
+                        <th style="width: 120px;">Status</th>
+                        <th style="width: 300px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (empty($users)): ?>
+                    <?php if (empty($customers)): ?>
                         <tr>
-                            <td colspan="6" class="empty-state">No user registration requests found.</td>
+                            <td colspan="6" class="empty-state">No customer registrations found.</td>
                         </tr>
                     <?php else: ?>
-                        <?php foreach ($users as $user): ?>
+                        <?php foreach ($customers as $cust): ?>
                         <tr>
-                            <td class="user-email"><?php echo htmlspecialchars($user['email']); ?></td>
+                            <td>#<?php echo $cust['id']; ?></td>
                             <td>
-                                <span class="user-provider">
-                                    <?php echo !empty($user['google_id']) ? 'Google OAuth' : 'Email/Password'; ?>
-                                </span>
+                                <!-- Customer Inline Rename Form -->
+                                <form action="<?php echo base_url('admin/customer/update/' . $cust['id']); ?>" method="post" style="display: flex; gap: 8px; align-items: center;">
+                                    <input type="text" name="name" value="<?php echo htmlspecialchars($cust['name']); ?>" style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 12px; border-radius: 8px; font-size: 14px; font-weight: 600; width: 220px;" required />
+                                    <button type="submit" class="action-btn btn-approve" style="padding: 6px 12px; font-size: 11px; border-radius: 6px;">Rename</button>
+                                </form>
                             </td>
                             <td>
-                                <div class="verify-status">
-                                    <?php if (!empty($user['email_verified_at'])): ?>
-                                        <span class="dot dot-verified"></span>
-                                        <span>Verified (<?php echo date('M d, H:i', strtotime($user['email_verified_at'])); ?>)</span>
+                                <div style="display: flex; flex-direction: column; gap: 6px;">
+                                    <?php if (empty($cust['users'])): ?>
+                                        <span style="color: var(--text-muted); font-size: 13px; font-style: italic;">No users registered</span>
                                     <?php else: ?>
-                                        <span class="dot dot-unverified"></span>
-                                        <span>Unverified</span>
+                                        <?php foreach ($cust['users'] as $u): ?>
+                                            <div style="font-size: 13px; display: flex; gap: 8px; align-items: center;">
+                                                <span style="font-weight: 500; color: #E2E8F0;"><?php echo htmlspecialchars($u['email']); ?></span>
+                                                <?php if (!empty($u['email_verified_at'])): ?>
+                                                    <span style="color: var(--success); font-size: 11px;">✔ Verified</span>
+                                                <?php else: ?>
+                                                    <span style="color: var(--warning); font-size: 11px;">⚠ Unverified</span>
+                                                <?php endif; ?>
+                                                <?php if ($u['is_admin']): ?>
+                                                    <span style="background: var(--primary); font-size: 10px; padding: 2px 6px; border-radius: 4px; color: white; font-weight: bold;">ADMIN</span>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php endforeach; ?>
                                     <?php endif; ?>
                                 </div>
                             </td>
-                            <td><?php echo date('Y-m-d H:i:s', strtotime($user['created_at'])); ?></td>
+                            <td><?php echo date('Y-m-d H:i', strtotime($cust['created_at'])); ?></td>
                             <td>
-                                <span class="badge badge-<?php echo $user['status']; ?>">
-                                    <?php echo $user['status']; ?>
+                                <span class="badge badge-<?php echo $cust['status']; ?>">
+                                    <?php echo $cust['status']; ?>
                                 </span>
                             </td>
                             <td class="actions-cell">
-                                <?php if ($user['status'] === 'pending' || $user['status'] === 'rejected'): ?>
-                                    <form action="<?php echo base_url('admin/approve/' . $user['id']); ?>" method="post" style="display:inline;">
-                                        <button type="submit" class="action-btn btn-approve">Approve</button>
-                                    </form>
-                                <?php endif; ?>
-                                
-                                <?php if ($user['status'] === 'pending' || $user['status'] === 'approved'): ?>
-                                    <form action="<?php echo base_url('admin/reject/' . $user['id']); ?>" method="post" style="display:inline;">
-                                        <button type="submit" class="action-btn btn-reject">Reject</button>
-                                    </form>
-                                <?php endif; ?>
+                                <div style="display: flex; gap: 6px; align-items: center;">
+                                    <a href="<?php echo base_url('admin/customer/' . $cust['id']); ?>" class="action-btn" style="background: rgba(37, 99, 235, 0.15); color: #60A5FA; border: 1px solid rgba(37, 99, 235, 0.3); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; height: 34px;">Manage / Support</a>
+                                    <?php if ($cust['status'] === 'pending' || $cust['status'] === 'rejected'): ?>
+                                        <form action="<?php echo base_url('admin/approve/' . $cust['id']); ?>" method="post" style="display:inline; margin: 0;">
+                                            <button type="submit" class="action-btn btn-approve" style="height: 34px;">Approve</button>
+                                        </form>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ($cust['status'] === 'pending' || $cust['status'] === 'approved'): ?>
+                                        <form action="<?php echo base_url('admin/reject/' . $cust['id']); ?>" method="post" style="display:inline; margin: 0;">
+                                            <button type="submit" class="action-btn btn-reject" style="height: 34px;">Block / Disable</button>
+                                        </form>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
             </table>
+            </div>
         </div>
     </div>
 

@@ -61,18 +61,27 @@ class AuthController extends BaseController
 
         $verificationToken = bin2hex(random_bytes(32));
 
-        $data = [
+        $db->transStart();
+        
+        $db->table('customers')->insert([
+            'name'       => 'Company of ' . $email,
+            'status'     => 'pending',
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+        $customerId = $db->insertID();
+
+        $userData = [
+            'customer_id'        => $customerId,
             'email'              => $email,
             'password_hash'      => password_hash($password, PASSWORD_BCRYPT),
             'google_id'          => null,
             'verification_token' => $verificationToken,
-            'status'             => 'pending',
             'created_at'         => date('Y-m-d H:i:s'),
             'updated_at'         => date('Y-m-d H:i:s')
         ];
 
-        $db->transStart();
-        $builder->insert($data);
+        $builder->insert($userData);
         $db->transComplete();
 
         if ($db->transStatus() === false) {
@@ -165,15 +174,24 @@ class AuthController extends BaseController
             ])->setStatusCode(403);
         }
 
+        // Fetch linked customer record
+        $customer = $db->table('customers')->where('id', $user->customer_id)->get()->getRow();
+        if (!$customer) {
+            return $this->response->setJSON([
+                'status'  => 'error',
+                'message' => 'Linked customer account not found.'
+            ])->setStatusCode(403);
+        }
+
         // Enforce admin registration approval
-        if ($user->status === 'pending') {
+        if ($customer->status === 'pending') {
             return $this->response->setJSON([
                 'status'  => 'error',
                 'message' => 'Account pending admin registration approval.'
             ])->setStatusCode(403);
         }
 
-        if ($user->status === 'rejected') {
+        if ($customer->status === 'rejected') {
             return $this->response->setJSON([
                 'status'  => 'error',
                 'message' => 'Account registration has been rejected or disabled.'
@@ -197,8 +215,43 @@ class AuthController extends BaseController
             'user'   => [
                 'id'    => (int)$user->id,
                 'email' => $user->email,
-                'status'=> $user->status
+                'status'=> $customer->status
             ]
+        ]);
+    }
+
+    /**
+     * GET /api/auth/status?email=xxx
+     */
+    public function checkStatus()
+    {
+        $request = service('request');
+        $email = $request->getGet('email');
+
+        if (!$email) {
+            return $this->response->setJSON([
+                'status'  => 'error',
+                'message' => 'Email is required'
+            ])->setStatusCode(400);
+        }
+
+        $db = \Config\Database::connect();
+        $user = $db->table('users')->where('email', $email)->get()->getRow();
+
+        if (!$user) {
+            return $this->response->setJSON([
+                'status'  => 'error',
+                'message' => 'User not found'
+            ])->setStatusCode(404);
+        }
+
+        $customer = $db->table('customers')->where('id', $user->customer_id)->get()->getRow();
+        $customerStatus = $customer ? $customer->status : 'pending';
+
+        return $this->response->setJSON([
+            'status'         => 'success',
+            'user_status'    => $customerStatus,
+            'email_verified' => !empty($user->email_verified_at)
         ]);
     }
 
@@ -240,15 +293,19 @@ class AuthController extends BaseController
                 ]);
             }
 
+            // Fetch linked customer record
+            $customer = $db->table('customers')->where('id', $user->customer_id)->get()->getRow();
+            $customerStatus = $customer ? $customer->status : 'pending';
+
             // Check status
-            if ($user->status === 'pending') {
+            if ($customerStatus === 'pending') {
                 return $this->response->setJSON([
                     'status'  => 'pending',
                     'message' => 'Account pending admin registration approval.'
                 ])->setStatusCode(403);
             }
 
-            if ($user->status === 'rejected') {
+            if ($customerStatus === 'rejected') {
                 return $this->response->setJSON([
                     'status'  => 'rejected',
                     'message' => 'Account registration has been rejected or disabled.'
@@ -256,18 +313,35 @@ class AuthController extends BaseController
             }
         } else {
             // Create pending Google user (email verified automatically via Google OAuth)
+            $db->transStart();
+
+            $db->table('customers')->insert([
+                'name'       => 'Company of ' . $email,
+                'status'     => 'pending',
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+            $customerId = $db->insertID();
+
             $data = [
+                'customer_id'       => $customerId,
                 'email'             => $email,
                 'google_id'         => $googleId,
                 'password_hash'     => null,
                 'email_verified_at' => date('Y-m-d H:i:s'),
-                'status'            => 'pending',
                 'created_at'        => date('Y-m-d H:i:s'),
                 'updated_at'        => date('Y-m-d H:i:s')
             ];
 
             $builder->insert($data);
-            $userId = $db->insertID();
+            $db->transComplete();
+
+            if ($db->transStatus() === false) {
+                return $this->response->setJSON([
+                    'status'  => 'error',
+                    'message' => 'Failed to create user account'
+                ])->setStatusCode(500);
+            }
 
             return $this->response->setJSON([
                 'status'  => 'pending',
@@ -292,7 +366,7 @@ class AuthController extends BaseController
             'user'   => [
                 'id'    => (int)$user->id,
                 'email' => $user->email,
-                'status'=> $user->status
+                'status'=> $customerStatus
             ]
         ]);
     }

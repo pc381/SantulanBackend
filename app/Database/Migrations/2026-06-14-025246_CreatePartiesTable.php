@@ -15,7 +15,7 @@ class CreatePartiesTable extends Migration
                 'unsigned'       => true,
                 'auto_increment' => true,
             ],
-            'user_id' => [
+            'customer_id' => [
                 'type'       => 'INT',
                 'constraint' => 11,
                 'unsigned'   => true,
@@ -85,8 +85,8 @@ class CreatePartiesTable extends Migration
         ]);
 
         $this->forge->addKey('id', true);
-        $this->forge->addForeignKey('user_id', 'users', 'id', 'CASCADE', 'CASCADE');
-        $this->forge->addUniqueKey(['user_id', 'client_local_id']);
+        $this->forge->addForeignKey('customer_id', 'customers', 'id', 'CASCADE', 'CASCADE');
+        $this->forge->addUniqueKey(['customer_id', 'client_local_id']);
         $this->forge->createTable('parties');
     }
 
